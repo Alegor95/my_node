@@ -1,0 +1,3 @@
+ls fstest -l
+touch fstest/test.txt
+ls fstest -l

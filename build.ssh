@@ -1,0 +1,4 @@
+gcc -c main.c -o main.o `pkg-config fuse --cflags --libs`
+gcc -c mynode.c -o mynode.o
+gcc -Wall main.o mynode.o `pkg-config fuse --cflags --libs` -o fs
+rm main.o mynode.o
