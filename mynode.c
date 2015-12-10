@@ -3,6 +3,8 @@
 #include <time.h>
 #include <stdio.h>
 #include <fcntl.h>
+#include <unistd.h>
+#include <stdlib.h>
 //mynode defenition and it methods
 //Inode consts
 #define INODE_COUNT 100
@@ -34,9 +36,12 @@ int _addNode(struct my_node *node, int errorsThrow){
     my_nodes_cache[new_number].mode);
 }
 //Fill node with values
-int fillNode(struct my_node *node, int mode, int dev_id, int oid, int gid, char *content){
+int fillNode(struct my_node *node, int mode, int dev_id, char *content){
 	node->mode = mode;
+  //
+  int oid = (int)getuid();
 	node->owner_id = oid;
+  int gid = (int)getgid();
 	node->owner_group_id = gid;
   node->device_id = dev_id;
 	time_t now;
@@ -60,6 +65,38 @@ int getNodeByNumber(int number, my_node *buffer){
   printf("Получена нода с номером %d, mode %d\n",
     number,
     buffer->mode);
+  return 0;
+}
+int getNumberByPath(const char *path){
+  printf("Вычисление номера ноды из пути %s\n", path);
+  //Get file name
+  char * pch;
+  pch = strrchr(path, '/');
+  int lastSlash = pch - path + 1;
+  char *filename;
+  int filenameLength = (strlen(path)-lastSlash)*sizeof(char);
+  filename = (char*)malloc(filenameLength);
+  int i = lastSlash;
+  for (i = lastSlash; i < strlen(path); i++){
+    filename[i - lastSlash] = path[i];
+  }
+  filename[filenameLength] = 0;
+  //Just now
+  int number = atoi(filename);
+  if (!number){
+    if (strcmp(path, "/")!=0){
+      return -1;
+    }
+  }
+  return number;
+}
+//Get node by it path
+int getNodeByPath(const char *path, struct my_node *node){
+  int number = getNumberByPath(path);
+  if (getNodeByNumber(number, node)){
+    printf("Нода с путем %s не найдена\n", path);
+    return -1;
+  }
   return 0;
 }
 //Update node information
@@ -95,7 +132,7 @@ int mynode_initialization(){
   //Add root node (0 number)
   printf("Инициализация корневой ноды %s\n", "");
   struct my_node root = (struct my_node){0};
-  fillNode(&root, S_IFDIR | 0755, 0, 0, 0, "shit");//Директория же ж
+  fillNode(&root, S_IFDIR | 0755, 0, "shit");//Директория же ж
   _addNode(&root, 0);
   printf("%s\n", "Система нод готова");
 }

@@ -17,7 +17,7 @@ static int node_mknod(const char *path, mode_t mode, dev_t dev)
 	int res = 0;
 	printf("node_nknod: создание файла %s\n", path);
 	struct my_node new_node = (struct my_node){0};
-	fillNode(&new_node, (unsigned int)mode, (unsigned int)dev, 0, 0, "");
+	fillNode(&new_node, (unsigned int)mode, (unsigned int)dev, "");
 	if(addNode(&new_node)){
 		printf("node_nknod: ошибка при создании файла%s\n", path);
 		return -EIO;
@@ -27,22 +27,25 @@ static int node_mknod(const char *path, mode_t mode, dev_t dev)
 //Get file information
 static int node_getattr(const char *path, struct stat *stbuf)
 {
-	int res = 0;
-	//Prev version
 	memset(stbuf, 0, sizeof(struct stat));
-	if (strcmp(path, "/") == 0) {
-		stbuf->st_mode = S_IFDIR | 0755;
-		stbuf->st_nlink = 2;
-	} else if (strcmp(path, hello_path) == 0) {
-
-		stbuf->st_nlink = 1;
-		stbuf->st_size = strlen(hello_str);
-	} else
-		res = -ENOENT;
 	//Get inode number
 	printf("node_getattr: получение информации о файле %s\n", path);
-
-	return res;
+  struct my_node buffer = (struct my_node){0};
+	if (getNodeByPath(path, &buffer)){
+		printf("node_getattr: не удалось получить информацию о файле %s\n", path);
+		return -ENOENT;
+	}
+	//Parse node to stat
+	stbuf->st_dev = buffer.device_id;
+	stbuf->st_mode = buffer.mode;
+	stbuf->st_nlink = 1;
+	stbuf->st_uid = buffer.owner_id;
+	stbuf->st_gid = buffer.owner_group_id;
+	stbuf->st_atime = buffer.a_time;
+	stbuf->st_mtime = buffer.m_time;
+	stbuf->st_ctime = buffer.c_time;
+  //Yuppi!
+	return 0;
 }
 
 static int node_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
@@ -63,7 +66,7 @@ static int node_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		if (!getNodeByNumber(i, &buffer)){
 		  char filename[20];
 		  sprintf(filename, "%d", i);
-			printf("node_readdir: добавление файла %s в список директории", filename);
+			printf("node_readdir: добавление файла %s в список директории\n", filename);
 		  filler(buf, filename, NULL, 0);
 		}
 	}

@@ -18,7 +18,8 @@ typedef struct my_node{
 int addNode(struct my_node *node);
 int mynode_initialization();
 int getNodeByNumber(int number, struct my_node *node);
+int getNodeByPath(const char *path, struct my_node *node);
 int updateNode(int number, my_node *node);
 int removeNode(int number);
-int fillNode(struct my_node *node, int mode, int dev_id, int oid, int gid, char *content);
+int fillNode(struct my_node *node, int mode, int dev_id, char *content);
 #endif
