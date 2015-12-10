@@ -3,6 +3,7 @@
 #define MYNODE_H_INCLUDED
 //Inode structure
 typedef struct my_node{
+	int number;
 	unsigned int mode;
   unsigned int device_id;
 	unsigned int owner_id;
@@ -22,5 +23,5 @@ int getNodeByNumber(int number, struct my_node *node);
 int getNodeByPath(const char *path, struct my_node *node);
 int updateNode(int number, my_node *node);
 int removeNode(int number);
-int fillNode(struct my_node *node, int mode, int dev_id, char *content);
+int fillNode(struct my_node *node, int number, int mode, int dev_id, char *content);
 #endif

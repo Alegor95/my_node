@@ -30,6 +30,7 @@ int _addNode(struct my_node *node, int errorsThrow){
   }
   //Free number not found - throw error(if it not internal call)
   if (new_number == 0 && errorsThrow) return -1;
+  node->number=new_number;
   //Write node to Cache
   memcpy(&my_nodes_cache[new_number], node, sizeof(my_node));
   if (DEBUG) printf("debug: добавлена нода с номером %d, mode %d\n",
@@ -37,7 +38,8 @@ int _addNode(struct my_node *node, int errorsThrow){
     my_nodes_cache[new_number].mode);
 }
 //Fill node with values
-int fillNode(struct my_node *node, int mode, int dev_id, char *content){
+int fillNode(struct my_node *node, int node_n, int mode, int dev_id, char *content){
+  node->number = node_n;
 	node->mode = mode;
   //
   int oid = (int)getuid();
@@ -133,7 +135,7 @@ int mynode_initialization(){
   //Add root node (0 number)
   if (DEBUG) printf("debug: инициализация корневой ноды %s\n", "");
   struct my_node root = (struct my_node){0};
-  fillNode(&root, S_IFDIR | 0755, 0, "shit");//Директория же ж
+  fillNode(&root, 0, S_IFDIR | 0755, 0, "shit");//Директория же ж
   _addNode(&root, 0);
   if (DEBUG) printf("%s\n", "debug: система нод готова");
 }
