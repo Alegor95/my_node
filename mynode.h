@@ -17,6 +17,7 @@ typedef struct my_node{
 //Methods
 int addNode(struct my_node *node);
 int mynode_initialization();
+int getNumberByPath(const char *path);
 int getNodeByNumber(int number, struct my_node *node);
 int getNodeByPath(const char *path, struct my_node *node);
 int updateNode(int number, my_node *node);

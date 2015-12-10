@@ -1,3 +1,8 @@
 ls fstest -l
-touch fstest/test.txt
+touch fstest/test1.txt
+touch fstest/test2.txt
+ls fstest -l
+rm fstest/1
+ls fstest -l
+touch fstest/test1.txt
 ls fstest -l

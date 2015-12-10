@@ -11,11 +11,22 @@
 static const char *hello_str = "Hello World!\n";
 static const char *hello_path = "/hello";
 //Fuse methods
+//Remove file
+int node_unlink(const char *path)
+{
+	printf("node_unlink: удаление файла %s\n", path);
+	int number = getNumberByPath(path);
+	if (number < 0){
+		printf("node_unlink: файл не существует %s\n", path);
+		return -ENOENT;
+	}
+	removeNode(number);
+}
 //Create file
 static int node_mknod(const char *path, mode_t mode, dev_t dev)
 {
 	int res = 0;
-	printf("node_nknod: создание файла %s\n", path);
+	printf("node_mknod: создание файла %s\n", path);
 	struct my_node new_node = (struct my_node){0};
 	fillNode(&new_node, (unsigned int)mode, (unsigned int)dev, "");
 	if(addNode(&new_node)){
@@ -108,7 +119,8 @@ static struct fuse_operations hello_oper = {
 	.readdir	= node_readdir,
 	.open		= node_open,
 	.read		= node_read,
-	.mknod = node_mknod
+	.mknod = node_mknod,
+	.unlink = node_unlink
 };
 
 int main(int argc, char *argv[])
