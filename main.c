@@ -6,7 +6,11 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <time.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
 #include "mynode.h"
+#include "node_content.h"
 
 static const char *hello_str = "Hello World!\n";
 static const char *hello_path = "/hello";
@@ -21,6 +25,7 @@ static int node_to_stat(struct my_node *buffer, struct stat *stbuf){
   stbuf->st_atime = buffer->a_time;
   stbuf->st_mtime = buffer->m_time;
   stbuf->st_ctime = buffer->c_time;
+	stbuf->st_size = buffer->content_size;
 }
 //Fuse methods
 //Remove file
@@ -91,9 +96,9 @@ static int node_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 static int node_open(const char *path, struct fuse_file_info *fi)
 {
-	if (strcmp(path, hello_path) != 0)
+	/*if (strcmp(path, hello_path) != 0)
 		return -ENOENT;
-
+*/
 	if ((fi->flags & 3) != O_RDONLY)
 		return -EACCES;
 
@@ -103,20 +108,21 @@ static int node_open(const char *path, struct fuse_file_info *fi)
 static int node_read(const char *path, char *buf, size_t size, off_t offset,
 		      struct fuse_file_info *fi)
 {
-	size_t len;
-	(void) fi;
-	if(strcmp(path, hello_path) != 0)
+	int len;
+	printf("nore_read: чтение %d байт из файла %s с позиции %d\n",
+	  (int)size,
+		path,
+		(int)offset);
+	//Get node by path
+	struct my_node node = (struct my_node){0};
+	if (getNodeByPath(path, &node)){
+		printf("node_read: не удалось получить информацию о файле %s\n", path);
 		return -ENOENT;
-
-	len = strlen(hello_str);
-	if (offset < len) {
-		if (offset + size > len)
-			size = len - offset;
-		memcpy(buf, hello_str + offset, size);
-	} else
-		size = 0;
-
-	return size;
+	}
+	//Read some info from node
+	len = readContent(&node, buf, offset, size);
+	//Size
+	return len;
 }
 
 static struct fuse_operations hello_oper = {
@@ -131,5 +137,6 @@ static struct fuse_operations hello_oper = {
 int main(int argc, char *argv[])
 {
 	mynode_initialization();
+	initializeContent();
 	return fuse_main(argc, argv, &hello_oper, NULL);
 }

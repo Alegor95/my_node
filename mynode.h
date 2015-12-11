@@ -13,7 +13,7 @@ typedef struct my_node{
 	time_t a_time;
 	unsigned int block_size;
 	unsigned int block_count;
-	//char *content;
+	unsigned int content_size;
 } my_node;
 //Methods
 int addNode(struct my_node *node);
