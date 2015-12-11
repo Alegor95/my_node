@@ -6,4 +6,5 @@ rm fstest/1
 ls fstest -li
 touch fstest/test1.txt
 ls fstest -li
+echo "test">fstest/1
 cat fstest/1

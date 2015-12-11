@@ -47,7 +47,7 @@ static int node_mknod(const char *path, mode_t mode, dev_t dev)
 	struct my_node new_node = (struct my_node){0};
 	fillNode(&new_node, 0, (unsigned int)mode, (unsigned int)dev, "");
 	if(addNode(&new_node)){
-		printf("node_nknod: ошибка при создании файла%s\n", path);
+		printf("node_mknod: ошибка при создании файла%s\n", path);
 		return -EIO;
 	}
 	return res;
@@ -99,12 +99,17 @@ static int node_open(const char *path, struct fuse_file_info *fi)
 	/*if (strcmp(path, hello_path) != 0)
 		return -ENOENT;
 */
+  printf("node_open: открытие файла %s, mode %d\n",
+	  path,
+		fi->flags);
+	//Check rights - not now
+	/*
 	if ((fi->flags & 3) != O_RDONLY)
 		return -EACCES;
-
+  */
 	return 0;
 }
-
+//Read buffer from file
 static int node_read(const char *path, char *buf, size_t size, off_t offset,
 		      struct fuse_file_info *fi)
 {
@@ -124,12 +129,32 @@ static int node_read(const char *path, char *buf, size_t size, off_t offset,
 	//Size
 	return len;
 }
-
+//Write buffer to file
+static int node_write(const char *path, const char *buf, size_t size, off_t offset,
+         struct fuse_file_info *fi)
+{
+	printf("node_write: запись %d байт на позицию %d файла %s\n",
+    (int)size,
+	  (int)offset,
+	  path);
+	//Get node by path
+	struct my_node node = (struct my_node){0};
+	if (getNodeByPath(path, &node)){
+		printf("node_read: не удалось получить информацию о файле %s\n", path);
+		return -ENOENT;
+	}
+	//Write node content
+	int len = 0;
+	len = writeContent(&node, buf, offset, size);
+	return len;
+}
+//Operations
 static struct fuse_operations hello_oper = {
 	.getattr	= node_getattr,
 	.readdir	= node_readdir,
 	.open		= node_open,
 	.read		= node_read,
+	.write = node_write,
 	.mknod = node_mknod,
 	.unlink = node_unlink
 };

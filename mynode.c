@@ -36,6 +36,7 @@ int _addNode(struct my_node *node, int errorsThrow){
   if (NODE_DEBUG) printf("debug: добавлена нода с номером %d, mode %d\n",
     new_number,
     my_nodes_cache[new_number].mode);
+  return 0;
 }
 //Fill node with values
 int fillNode(struct my_node *node, int node_n, int mode, int dev_id, char *content){

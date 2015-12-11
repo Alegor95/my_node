@@ -29,19 +29,26 @@ int readContent(struct my_node *node, char *buffer, off_t offset, size_t length)
   return length;
 }
 //Write content to RAM
-int writeContent(struct my_node *node, char *buffer, off_t offset, size_t length){
+int writeContent(struct my_node *node, const char *buffer, off_t offset, size_t length){
   if (CONTENT_DEBUG) printf("debug: запись контента длины %d для ноды %d\n",
     (int)sizeof(buffer),
     node->number);
-  node->content_size = length;
-  memcpy(&temp_content[node->number], buffer, length);
-  return 0;
+  //Check length
+  int new_length = offset+length;
+  if (new_length>BUFFER_LENGTH) {
+    new_length = BUFFER_LENGTH;
+    length = BUFFER_LENGTH - offset;
+  }
+  if (new_length > node->content_size){
+    node->content_size = new_length;
+  }
+  memcpy(&temp_content[node->number]+offset, buffer, length);
+  return length;
 }
 int initializeContent(){
   int i = 0;
-  char defaultContent[11] = "holy shiiit";
   for (i = 0; i < INODE_COUNT; i++){
-    memcpy(&temp_content[i], defaultContent, 11);
-    temp_content[i][12] = 0;
+    //memcpy(&temp_content[i], defaultContent, 11);
+    //temp_content[i][12] = 0;
   }
 }
