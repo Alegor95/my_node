@@ -50,11 +50,60 @@ static int node_mknod(const char *path, mode_t mode, dev_t dev)
 		printf("node_mknod: ошибка при создании файла%s\n", path);
 		return -EIO;
 	}
+	//Parse it
+	char *directory_path; char *filename;
+	filename = strrchr(path, '/')+1;
+	int dpath_len = (filename-path);
+	directory_path = (char *)malloc(dpath_len+1);
+	strncpy(directory_path, path, dpath_len);
+	directory_path[dpath_len] = 0;
+	//Get directory node
+	struct my_node dir = (struct my_node){0};
+	if (getNodeByNumber(0, &dir)){//Hack again
+		printf("node_mknod: директории по адресу %s не существует\n", path);
+		return -1;
+	}
+	//Check is file exists
+	//Get filenames
+	char *buffer;
+	buffer = malloc(dir.content_size);
+	int length = readContent(&dir, buffer, 0, dir.content_size);
+	char *current_fname; char *numText;
+	int fname_length = 0;
+  printf("node_mknod: проверка, существует ли файл %s\n", filename);
+	if (dir.content_size>0)
+	while (buffer != NULL) {
+	  //Get name length
+	  int fs = (int)(strstr(buffer, " ") - buffer);
+	  numText = (char *)malloc(fs);
+	  strncpy(numText, buffer, fs);
+	  //Get file name
+	  fname_length = atoi(numText);
+	  current_fname = (char *)malloc(fname_length);
+	  strncpy(current_fname, buffer+fs+1, fname_length);
+	  current_fname[fname_length]=0;
+		//Checking
+		if (!strcmp(current_fname, filename)){
+			return -EEXIST;
+		}
+	  //Prepare buffer to next iteration
+	  buffer = strstr(buffer, "\n");
+	  if (buffer != NULL) buffer = buffer + 1;
+	}
+	//Prepare entry
+	buffer = (char *)malloc(100);
+  if (dir.content_size>0){
+	  sprintf(buffer, "\n%d %s%d", (int)strlen(filename), filename, new_node.number);
+  } else {
+    sprintf(buffer, "%d %s%d", (int)strlen(filename), filename, new_node.number);
+  }
+	writeContent(&dir, buffer, dir.content_size, strlen(buffer));
+	//Update directory node
+	updateNode(dir.number, &dir);
 	return res;
 }
 //Get file information
-static int node_getattr(const char *path, struct stat *stbuf)
-{
+static int node_getattr(const char *path, struct stat *stbuf){
 	memset(stbuf, 0, sizeof(struct stat));
 	//Get inode number
 	printf("node_getattr: получение информации о файле %s\n", path);
@@ -81,15 +130,38 @@ static int node_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
   //
 	filler(buf, ".", NULL, 0);
 	filler(buf, "..", NULL, 0);
-	int i;
-	for (i=1; i < 10; i++){
-		struct my_node buffer = (struct my_node){0};
-		if (!getNodeByNumber(i, &buffer)){
-		  char filename[20];
-		  sprintf(filename, "%d", i);
-			printf("node_readdir: добавление файла %s в список директории\n", filename);
-		  filler(buf, filename, NULL, 0);
-		}
+	//Get directory node
+	struct my_node dir = (struct my_node){0};
+	if (getNodeByNumber(0, &dir)){//A lit hack, while i have only one dir
+    printf("node_readdir: директории по адресу %s не существует\n", path);
+		return 1;
+	}
+	//Check is directory empty
+	if (dir.content_size == 0){
+		printf("node_readdir: директория %s пуста\n", path);
+		 return 0;
+	 }
+	//Get filenames
+	char *buffer;
+	buffer = malloc(dir.content_size);
+	int length = readContent(&dir, buffer, 0, dir.content_size);
+	char *current_fname; char *numText;//A lit hack, while i have only one dir
+	int fname_length = 0;
+	while (buffer != NULL) {
+		//Get name length
+		int fs = (int)(strstr(buffer, " ") - buffer);
+		numText = (char *)malloc(fs);
+		strncpy(numText, buffer, fs);
+		//Get file name
+		fname_length = atoi(numText);
+		current_fname = (char *)malloc(fname_length);
+		strncpy(current_fname, buffer+fs+1, fname_length);
+		current_fname[fname_length]=0;
+    //Add to filler
+		filler(buf, current_fname, NULL, 0);
+		//Prepare buffer to next iteration
+		buffer = strstr(buffer, "\n");
+		if (buffer != NULL) buffer = buffer + 1;
 	}
 	return 0;
 }

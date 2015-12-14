@@ -5,13 +5,14 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include "node_content.h"
 //mynode defenition and it methods
 //Inode consts
 #define INODE_COUNT 100
 #define DIRECT_COUNT 10
 #define BLOCK_SIZE 4096
 #define BLOCK_COUNT 512
-#define NODE_DEBUG 0
+#define NODE_DEBUG 1
 //Cache of inodes
 struct my_node my_nodes_cache[INODE_COUNT];
 //Add node to list
@@ -66,33 +67,102 @@ int getNodeByNumber(int number, my_node *buffer){
     return -1;
   }
   memcpy(buffer, &my_nodes_cache[number], sizeof(my_node));
-  if (NODE_DEBUG) printf("debug: получена нода с номером %d, mode %d\n",
+  if (NODE_DEBUG) printf("debug: получена нода с номером %d, контент %d\n",
     number,
-    buffer->mode);
+    buffer->content_size);
   return 0;
 }
+//Получение нода файла в директории
+int getNumberFromDirectory(struct my_node *dir, const char *filename){
+  if (NODE_DEBUG) printf("debug: получение номера ноды файла %s директории %d\n",
+    filename,
+    dir->number);
+  if (strlen(filename) == 0){
+    if (NODE_DEBUG) printf("debug: имя файла пустое - возвращаем директорию%s\n", "");
+    return dir->number;
+  }
+  if (dir->content_size == 0){
+    return -1;
+  }
+  char *buffer;
+  buffer = (char *)malloc(dir->content_size);
+  readContent(dir, buffer, 0, dir->content_size);
+  char *current_fname; char *numText;
+  int fname_length = 0; int node_num = -1;
+  while (buffer != NULL) {
+    //Parse directory entry
+  		//Get name length
+      char *space_pos = strstr(buffer, " ");
+      if (space_pos == NULL) break;
+  		int fs = (int)(space_pos - buffer);
+  		numText = (char *)malloc(fs);
+  		strncpy(numText, buffer, fs);
+  		fname_length = atoi(numText);
+      free(numText);
+  		//Get file name
+  		current_fname = (char *)malloc(fname_length);
+  		strncpy(current_fname, buffer+fs+1, fname_length);
+  		current_fname[fname_length]=0;
+      char *next_line = strstr(buffer, "\n");
+      if (NODE_DEBUG) printf("debug: проверка имени %s %d\n", current_fname, fname_length);
+      if (strlen(current_fname)) //if current_fname not empty
+      if (!strcmp(current_fname, filename)){
+        if (NODE_DEBUG) printf("debug: имя %s %d подходит\n", current_fname, fname_length);
+        //Found, try to get node
+        char *node_text;
+        int node_len;
+        if (next_line != NULL){
+          node_len = (int)(next_line-buffer) - fs -1 - fname_length;
+        } else {
+          node_len=0;
+        }
+        node_text = (char *)malloc(node_len);
+        strncpy(node_text, buffer+fs+1+fname_length, node_len);
+        node_num = atoi(node_text);
+        free(node_text);
+        free(current_fname);
+        break;
+      } else {
+        if (NODE_DEBUG) printf("debug: имя %s %d не подходит\n", current_fname, fname_length);
+        free(current_fname);
+      }
+    //Prepare buffer to next iteration
+    buffer = next_line;
+    if (buffer != NULL) buffer = buffer + 1;
+  }
+  return node_num;
+}
+//Вычисление ноды из пути
 int getNumberByPath(const char *path){
   if (NODE_DEBUG) printf("debug: вычисление номера ноды из пути %s\n", path);
-  //Get file name
-  char * pch;
-  pch = strrchr(path, '/');
-  int lastSlash = pch - path + 1;
-  char *filename;
-  int filenameLength = (strlen(path)-lastSlash)*sizeof(char);
-  filename = (char*)malloc(filenameLength);
-  int i = lastSlash;
-  for (i = lastSlash; i < strlen(path); i++){
-    filename[i - lastSlash] = path[i];
-  }
-  filename[filenameLength] = 0;
-  //Just now
-  int number = atoi(filename);
-  if (!number){
-    if (strcmp(path, "/")!=0){
-      return -1;
+  //Skip first slash - it's a root dir
+  path = strstr(path, "/")+1;
+  struct my_node dir;
+  getNodeByNumber(0, &dir);
+  while (path != NULL) {
+    //Get directory
+    char *next_path = strstr(path, "/");
+    if (next_path != NULL) {
+      //If not end of path
+      //Change dir
+      int dir_name_l = (int)(path - next_path);
+      char *dir_name = (char *)malloc(dir_name_l);
+      strncpy(dir_name, path, dir_name_l);
+      if (NODE_DEBUG) printf("debug: следующая директория %s\n", dir_name);
+      int dir_num = getNumberFromDirectory(&dir, dir_name);
+      getNodeByNumber(dir_num, &dir);
+      //Prepare next iteration
+      path = next_path + 1;
+      free(dir_name);
+    } else {
+      if (NODE_DEBUG) printf("debug: конечная нода с именем %s\n", path);
+      //If it's last entry, return number
+      int number = getNumberFromDirectory(&dir, path);
+      return number;
     }
   }
-  return number;
+  //Nothing found, return -1
+  return -1;
 }
 //Get node by it path
 int getNodeByPath(const char *path, struct my_node *node){

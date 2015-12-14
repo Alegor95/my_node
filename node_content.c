@@ -15,10 +15,6 @@ char temp_content[INODE_COUNT][BUFFER_LENGTH];
 //Methods implementation
 //Read content from RAM
 int readContent(struct my_node *node, char *buffer, off_t offset, size_t length){
-  //Just tmp
-  if (node->content_size == 0){
-    node -> content_size = 11;
-  }
   if (offset+length >= node->content_size){
     length = node->content_size-offset;
   }
@@ -26,12 +22,16 @@ int readContent(struct my_node *node, char *buffer, off_t offset, size_t length)
     node->number,
     (int)length);
   memcpy(buffer, &temp_content[node->number]+offset, length);
+  if (CONTENT_DEBUG) printf("debug: контент ноды %d считан, кол-во байт %d\n",
+    node->number,
+    (int)length);
   return length;
 }
 //Write content to RAM
 int writeContent(struct my_node *node, const char *buffer, off_t offset, size_t length){
-  if (CONTENT_DEBUG) printf("debug: запись контента длины %d для ноды %d\n",
-    (int)sizeof(buffer),
+  if (CONTENT_DEBUG) printf("debug: запись контента длины %d на позицию %d для ноды %d\n",
+    (int)length,
+    (int)offset,
     node->number);
   //Check length
   int new_length = offset+length;
@@ -41,8 +41,11 @@ int writeContent(struct my_node *node, const char *buffer, off_t offset, size_t 
   }
   if (new_length > node->content_size){
     node->content_size = new_length;
+    printf("debug: новая длина контента %d для ноды %d\n",
+      node->content_size,
+      node->number);
   }
-  memcpy(&temp_content[node->number]+offset, buffer, length);
+  memcpy(&(temp_content[node->number][0])+offset, buffer, length);
   return length;
 }
 int initializeContent(){
