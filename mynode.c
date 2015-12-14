@@ -114,10 +114,11 @@ int getNumberFromDirectory(struct my_node *dir, const char *filename){
         if (next_line != NULL){
           node_len = (int)(next_line-buffer) - fs -1 - fname_length;
         } else {
-          node_len=0;
+          node_len=(int)(strlen(buffer) -fs - 1 - fname_length);
         }
         node_text = (char *)malloc(node_len);
         strncpy(node_text, buffer+fs+1+fname_length, node_len);
+        if (NODE_DEBUG) printf("debug: id ноды %s\n", node_text);
         node_num = atoi(node_text);
         free(node_text);
         free(current_fname);

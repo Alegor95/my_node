@@ -112,6 +112,9 @@ static int node_getattr(const char *path, struct stat *stbuf){
 		printf("node_getattr: не удалось получить информацию о файле %s\n", path);
 		return -ENOENT;
 	}
+  printf("node_getattr: получена нода %d, mode %d\n",
+    buffer.number,
+    buffer.mode);
 	//Parse node to stat
 	node_to_stat(&buffer, stbuf);
   //Yuppi!
