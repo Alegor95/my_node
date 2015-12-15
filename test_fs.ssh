@@ -2,9 +2,9 @@ ls fstest -li
 touch fstest/test1.txt
 touch fstest/test2.txt
 ls fstest -li
-rm fstest/1
+rm fstest/test1.txt
 ls fstest -li
 touch fstest/test1.txt
 ls fstest -li
-echo "test">fstest/1
-cat fstest/1
+echo "test">fstest/test1.txt
+cat fstest/test1.txt

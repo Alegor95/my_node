@@ -1,0 +1,4 @@
+touch fstest/a
+touch fstest/b
+touch fstest/c
+rm fstest/b
