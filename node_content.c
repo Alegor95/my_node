@@ -41,10 +41,10 @@ int writeContent(struct my_node *node, const char *buffer, off_t offset, size_t 
   }
   if (new_length > node->content_size){
     node->content_size = new_length;
-    printf("debug: новая длина контента %d для ноды %d\n",
-      node->content_size,
-      node->number);
   }
+  printf("debug: новая длина контента %d для ноды %d\n",
+    node->content_size,
+    node->number);
   memcpy(&(temp_content[node->number][0])+offset, buffer, length);
   return length;
 }

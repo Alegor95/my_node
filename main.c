@@ -12,14 +12,11 @@
 #include "mynode.h"
 #include "node_content.h"
 
-static const char *hello_str = "Hello World!\n";
-static const char *hello_path = "/hello";
 //Converters
 static int node_to_stat(struct my_node *buffer, struct stat *stbuf){
   stbuf->st_ino=buffer->number;
   stbuf->st_dev = buffer->device_id;
   stbuf->st_mode = buffer->mode;
-  stbuf->st_nlink = 1;
   stbuf->st_uid = buffer->owner_id;
   stbuf->st_gid = buffer->owner_group_id;
   stbuf->st_atime = buffer->a_time;
@@ -27,69 +24,15 @@ static int node_to_stat(struct my_node *buffer, struct stat *stbuf){
   stbuf->st_ctime = buffer->c_time;
 	stbuf->st_size = buffer->content_size;
 }
-//Fuse methods
-//Remove file
-int node_unlink(const char *path)
-{
-	printf("node_unlink: удаление файла %s\n", path);
-	int number = getNumberByPath(path);
-	if (number < 0){
-		printf("node_unlink: файл не существует %s\n", path);
-		return -ENOENT;
-	}
-  //Remove from directory
-  //Parse path
-  char *filename = strrchr(path, '/')+1;
-  char *directory_path;
-  int directory_l = (int)(filename - path);
-  directory_path  = (char *)malloc(directory_l);
-  strncpy(directory_path, path, directory_l);
-  directory_path[directory_l]=0;
-  //Remove from content
-  struct my_node dir = (struct my_node){0};
-  getNodeByPath(directory_path, &dir);
-  //Create entity
-  char *ent_buffer;
-  ent_buffer = (char *)malloc(100);
-  sprintf(ent_buffer, "%d %s%d", (int)strlen(filename), filename, number);
-  //Read directory content
-  char *buffer;
-  buffer = (char *)malloc(dir.content_size);
-  readContent(&dir, buffer, 0, dir.content_size);
-  //Delete from content
-  int ent_position = (strstr(buffer, ent_buffer) - buffer);
-  char *new_buffer = (char *)malloc(dir.content_size - strlen(ent_buffer));
-  strncpy(new_buffer, buffer, ent_position);
-  printf("|%s|\n|%s|\n", buffer, new_buffer);
-  if (dir.content_size == ent_position+strlen(ent_buffer)){
-    printf("%s\n", "wow");
-    strcpy(new_buffer+ent_position, buffer+ent_position+strlen(ent_buffer));
-  } else {
-    strcpy(new_buffer+ent_position, buffer+ent_position+strlen(ent_buffer)+1);
-  }
-  new_buffer[dir.content_size - strlen(ent_buffer)]=0;
-  printf("|%s|\n|%s|\n", buffer, new_buffer);
-  //Write new content
-  writeContent(&dir, new_buffer, 0, dir.content_size - strlen(ent_buffer));
-  dir.content_size = dir.content_size - strlen(ent_buffer)-1;
-  //Update node
-  updateNode(dir.number, &dir);
-  //free memory
-  free(new_buffer);
-  free(buffer);
-  free(ent_buffer);
-  free(directory_path);
-  //
-	removeNode(number);
-}
-//Create file
-static int node_mknod(const char *path, mode_t mode, dev_t dev){
-	int res = 0;
-	printf("node_mknod: создание файла %s\n", path);
-	struct my_node new_node = (struct my_node){0};
+//Common methods
+
+//Create a node in path
+static int create_node(const char *path, mode_t mode, dev_t dev){
+  int res = 0;
+  struct my_node new_node = (struct my_node){0};
 	fillNode(&new_node, 0, (unsigned int)mode, (unsigned int)dev, "");
 	if(addNode(&new_node)){
-		printf("node_mknod: ошибка при создании файла%s\n", path);
+		printf("create_node: ошибка при создании файла%s\n", path);
 		return -EIO;
 	}
 	//Parse it
@@ -101,8 +44,8 @@ static int node_mknod(const char *path, mode_t mode, dev_t dev){
 	directory_path[dpath_len] = 0;
 	//Get directory node
 	struct my_node dir = (struct my_node){0};
-	if (getNodeByNumber(0, &dir)){//Hack again
-		printf("node_mknod: директории по адресу %s не существует\n", path);
+	if (getNodeByPath(directory_path, &dir)){
+		printf("create_node: директории по адресу %s не существует\n", path);
 		return -1;
 	}
 	//Check is file exists
@@ -112,7 +55,7 @@ static int node_mknod(const char *path, mode_t mode, dev_t dev){
 	int length = readContent(&dir, buffer, 0, dir.content_size);
 	char *current_fname; char *numText;
 	int fname_length = 0;
-  printf("node_mknod: проверка, существует ли файл %s\n", filename);
+  printf("create_node: проверка, существует ли файл %s\n", filename);
 	if (dir.content_size>0)
 	while (buffer != NULL) {
 	  //Get name length
@@ -144,6 +87,77 @@ static int node_mknod(const char *path, mode_t mode, dev_t dev){
 	updateNode(dir.number, &dir);
 	return res;
 }
+int remove_node(const char *path){
+  int number = getNumberByPath(path);
+  if (number < 0){
+    printf("remove_node: файл не существует %s\n", path);
+    return -ENOENT;
+  }
+  //Remove from directory
+  //Parse path
+  char *filename = strrchr(path, '/')+1;
+  char *directory_path;
+  int directory_l = (int)(filename - path);
+  directory_path  = (char *)malloc(directory_l);
+  strncpy(directory_path, path, directory_l);
+  directory_path[directory_l]=0;
+  //Remove from content
+  struct my_node dir = (struct my_node){0};
+  getNodeByPath(directory_path, &dir);
+  //Create entity
+  char *ent_buffer;
+  ent_buffer = (char *)malloc(100);
+  sprintf(ent_buffer, "%d %s%d", (int)strlen(filename), filename, number);
+  //Read directory content
+  char *buffer;
+  buffer = (char *)malloc(dir.content_size);
+  readContent(&dir, buffer, 0, dir.content_size);
+  //Delete from content
+  int ent_position = (strstr(buffer, ent_buffer) - buffer);
+  char *new_buffer = (char *)malloc(dir.content_size - strlen(ent_buffer));
+  strncpy(new_buffer, buffer, ent_position);
+  printf("|%s|\n|%s|\n", buffer, new_buffer);
+  if (dir.content_size == ent_position+strlen(ent_buffer)){
+    strcpy(new_buffer+ent_position, buffer+ent_position+strlen(ent_buffer));
+  } else {
+    strcpy(new_buffer+ent_position, buffer+ent_position+strlen(ent_buffer)+1);
+  }
+  new_buffer[dir.content_size - strlen(ent_buffer)]=0;
+  printf("|%s|\n|%s|\n", buffer, new_buffer);
+  //Write new content
+  writeContent(&dir, new_buffer, 0, dir.content_size - strlen(ent_buffer));
+  if (dir.content_size - strlen(ent_buffer)>0){
+    dir.content_size = dir.content_size - strlen(ent_buffer) - 1;
+  } else {
+    dir.content_size = 0;
+  }
+  //Update node
+  updateNode(dir.number, &dir);
+  //free memory
+  free(new_buffer);
+  free(buffer);
+  free(ent_buffer);
+  free(directory_path);
+  //
+  removeNode(number);
+}
+//Fuse methods
+//Remove file
+int node_unlink(const char *path)
+{
+	printf("node_unlink: удаление файла %s\n", path);
+  remove_node(path);
+}
+//Create dir
+static int node_mkdir(const char *path, mode_t mode){
+  printf("node_mkdir: создание директории %s\n", path);
+  return create_node(path, S_IFDIR | mode, (dev_t)0);
+}
+//Create file
+static int node_mknod(const char *path, mode_t mode, dev_t dev){
+	printf("node_mknod: создание файла %s\n", path);
+  return create_node(path, mode, dev);
+}
 //Get file information
 static int node_getattr(const char *path, struct stat *stbuf){
 	memset(stbuf, 0, sizeof(struct stat));
@@ -162,7 +176,7 @@ static int node_getattr(const char *path, struct stat *stbuf){
   //Yuppi!
 	return 0;
 }
-
+//Read directory content
 static int node_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 			 off_t offset, struct fuse_file_info *fi){
 	(void) offset;
@@ -176,7 +190,7 @@ static int node_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	filler(buf, "..", NULL, 0);
 	//Get directory node
 	struct my_node dir = (struct my_node){0};
-	if (getNodeByNumber(0, &dir)){//A lit hack, while i have only one dir
+	if (getNodeByPath(path, &dir)){
     printf("node_readdir: директории по адресу %s не существует\n", path);
 		return 1;
 	}
@@ -263,6 +277,51 @@ static int node_write(const char *path, const char *buf, size_t size, off_t offs
 	updateNode(node.number, &node);
 	return len;
 }
+//Flush file content
+int node_flush(const char *path, struct fuse_file_info *fi){
+  printf("node_flush: очистка кеша для файла %s\n", path);
+  return 0;
+}
+//Release file descriptors
+int node_release(const char *path, struct fuse_file_info *fi){
+  printf("node_release: закрытие файла %s\n", path);
+  return 0;
+}
+// Change the size of a file
+int node_truncate(const char *path, off_t newsize){
+  printf("node_truncate: задание размера файла %s %d\n", path, (int)newsize);
+  struct my_node node = (struct my_node){0};
+	if (getNodeByPath(path, &node)){
+		printf("node_truncate: не удалось получить информацию о файле %s\n", path);
+		return -ENOENT;
+	}
+  if (node.content_size < newsize){
+    int adding_l = (int)(newsize - node.content_size);
+    char *buffer = (char *)malloc(adding_l);
+    memset(buffer, 0, adding_l);
+    writeContent(&node, buffer, node.content_size, adding_l);
+    free(buffer);
+  } else {
+    node.content_size = newsize;
+  }
+	updateNode(node.number, &node);
+  return 0;
+}
+//Remove directory
+int node_rmdir(const char *path){
+  printf("node_rmdir: удаление директории %s\n", path);
+  struct my_node node = (struct my_node){0};
+  if (getNodeByPath(path, &node)){
+    printf("node_rmdir: не удалось получить информацию о файле %s\n", path);
+    return -ENOENT;
+  }
+  if (node.content_size>0){
+    printf("node_rmdir: директория %s не пуста\n", path);
+    return -ENOTEMPTY;
+  }
+  remove_node(path);
+  return 0;
+}
 //Operations
 static struct fuse_operations hello_oper = {
 	.getattr	= node_getattr,
@@ -271,7 +330,12 @@ static struct fuse_operations hello_oper = {
 	.read		= node_read,
 	.write = node_write,
 	.mknod = node_mknod,
-	.unlink = node_unlink
+	.unlink = node_unlink,
+  .mkdir = node_mkdir,
+  .rmdir = node_rmdir,
+  .flush = node_flush,
+  .release = node_release,
+  .truncate = node_truncate
 };
 
 int main(int argc, char *argv[])

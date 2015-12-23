@@ -144,11 +144,16 @@ int getNumberByPath(const char *path){
     //Get directory
     char *next_path = strstr(path, "/");
     if (next_path != NULL) {
+      printf("%s\n", path);
+      printf("%s\n", next_path);
+      printf("%d\n", (int)(next_path-path));
       //If not end of path
       //Change dir
-      int dir_name_l = (int)(path - next_path);
+      int dir_name_l = (int)(next_path-path);
       char *dir_name = (char *)malloc(dir_name_l);
+      printf("%d\n", dir_name_l);
       strncpy(dir_name, path, dir_name_l);
+      dir_name[dir_name_l]=0;
       if (NODE_DEBUG) printf("debug: следующая директория %s\n", dir_name);
       int dir_num = getNumberFromDirectory(&dir, dir_name);
       getNodeByNumber(dir_num, &dir);
