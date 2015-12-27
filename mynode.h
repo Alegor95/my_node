@@ -1,6 +1,11 @@
 #include <time.h>
+//
 #ifndef MYNODE_H_INCLUDED
 #define MYNODE_H_INCLUDED
+//Inode consts
+#define INODE_COUNT 100
+#define DIRECT_COUNT 10
+#define NODE_DEBUG 1
 //Inode structure
 typedef struct my_node{
 	int number;

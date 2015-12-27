@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include "mynode.h"
 #include "node_content.h"
+#include "file_service.h"
 
 //Converters
 static int node_to_stat(struct my_node *buffer, struct stat *stbuf){
@@ -322,6 +323,16 @@ int node_rmdir(const char *path){
   remove_node(path);
   return 0;
 }
+//Create filesystem
+void* node_init(struct fuse_conn_info *conn) {
+    initializeFile();
+  	mynode_initialization();
+  	initializeContent();
+}
+//EXTERMINATE
+void node_destroy(void* userdata){
+  destroyFile();
+}
 //Operations
 static struct fuse_operations hello_oper = {
 	.getattr	= node_getattr,
@@ -335,12 +346,11 @@ static struct fuse_operations hello_oper = {
   .rmdir = node_rmdir,
   .flush = node_flush,
   .release = node_release,
-  .truncate = node_truncate
+  .truncate = node_truncate,
+  .destroy = node_destroy
 };
 
 int main(int argc, char *argv[])
 {
-	mynode_initialization();
-	initializeContent();
 	return fuse_main(argc, argv, &hello_oper, NULL);
 }

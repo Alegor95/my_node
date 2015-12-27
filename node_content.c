@@ -6,10 +6,6 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <sys/types.h>
-//Consts
-#define CONTENT_DEBUG 1
-#define BUFFER_LENGTH 1000
-#define INODE_COUNT 100
 //Temp content buffer
 char temp_content[INODE_COUNT][BUFFER_LENGTH];
 //Methods implementation
