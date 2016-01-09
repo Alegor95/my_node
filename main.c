@@ -6,11 +6,9 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <time.h>
-#include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include "mynode.h"
-#include "node_content.h"
 #include "file_service.h"
 
 //Converters
@@ -24,6 +22,7 @@ static int node_to_stat(struct my_node *buffer, struct stat *stbuf){
   stbuf->st_mtime = buffer->m_time;
   stbuf->st_ctime = buffer->c_time;
 	stbuf->st_size = buffer->content_size;
+  stbuf->st_blocks = buffer->block_count;
 }
 //Common methods
 
@@ -31,7 +30,7 @@ static int node_to_stat(struct my_node *buffer, struct stat *stbuf){
 static int create_node(const char *path, mode_t mode, dev_t dev){
   int res = 0;
   struct my_node new_node = (struct my_node){0};
-	fillNode(&new_node, 0, (unsigned int)mode, (unsigned int)dev, "");
+	fillNode(&new_node, 0, (unsigned int)mode, (unsigned int)dev);
 	if(addNode(&new_node)){
 		printf("create_node: ошибка при создании файла%s\n", path);
 		return -EIO;
@@ -53,7 +52,7 @@ static int create_node(const char *path, mode_t mode, dev_t dev){
 	//Get filenames
 	char *buffer;
 	buffer = malloc(dir.content_size);
-	int length = readContent(&dir, buffer, 0, dir.content_size);
+	int length = readContentFromFile(&dir, buffer, 0, dir.content_size);
 	char *current_fname; char *numText;
 	int fname_length = 0;
   printf("create_node: проверка, существует ли файл %s\n", filename);
@@ -83,9 +82,7 @@ static int create_node(const char *path, mode_t mode, dev_t dev){
   } else {
     sprintf(buffer, "%d %s%d", (int)strlen(filename), filename, new_node.number);
   }
-	writeContent(&dir, buffer, dir.content_size, strlen(buffer));
-	//Update directory node
-	updateNode(dir.number, &dir);
+	writeContentToFile(&dir, buffer, dir.content_size, strlen(buffer));
 	return res;
 }
 int remove_node(const char *path){
@@ -112,7 +109,7 @@ int remove_node(const char *path){
   //Read directory content
   char *buffer;
   buffer = (char *)malloc(dir.content_size);
-  readContent(&dir, buffer, 0, dir.content_size);
+  readContentFromFile(&dir, buffer, 0, dir.content_size);
   //Delete from content
   int ent_position = (strstr(buffer, ent_buffer) - buffer);
   char *new_buffer = (char *)malloc(dir.content_size - strlen(ent_buffer));
@@ -126,14 +123,13 @@ int remove_node(const char *path){
   new_buffer[dir.content_size - strlen(ent_buffer)]=0;
   printf("|%s|\n|%s|\n", buffer, new_buffer);
   //Write new content
-  writeContent(&dir, new_buffer, 0, dir.content_size - strlen(ent_buffer));
   if (dir.content_size - strlen(ent_buffer)>0){
     dir.content_size = dir.content_size - strlen(ent_buffer) - 1;
   } else {
     dir.content_size = 0;
   }
-  //Update node
-  updateNode(dir.number, &dir);
+  writeContentToFile(&dir, new_buffer,
+    0, dir.content_size);
   //free memory
   free(new_buffer);
   free(buffer);
@@ -169,12 +165,12 @@ static int node_getattr(const char *path, struct stat *stbuf){
 		printf("node_getattr: не удалось получить информацию о файле %s\n", path);
 		return -ENOENT;
 	}
-  printf("node_getattr: получена нода %d, mode %d\n",
+  printf("node_getattr: получена нода %d, контент %d\n",
     buffer.number,
-    buffer.mode);
+    buffer.content_size);
 	//Parse node to stat
 	node_to_stat(&buffer, stbuf);
-  //Yuppi!
+  //everything ok
 	return 0;
 }
 //Read directory content
@@ -199,11 +195,11 @@ static int node_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	if (dir.content_size == 0){
 		printf("node_readdir: директория %s пуста\n", path);
 		 return 0;
-	 }
+	}
 	//Get filenames
 	char *buffer;
 	buffer = malloc(dir.content_size);
-	int length = readContent(&dir, buffer, 0, dir.content_size);
+	int length = readContentFromFile(&dir, buffer, 0, dir.content_size);
 	char *current_fname; char *numText;//A lit hack, while i have only one dir
 	int fname_length = 0;
 	while (buffer != NULL) {
@@ -255,7 +251,7 @@ static int node_read(const char *path, char *buf, size_t size, off_t offset,
 		return -ENOENT;
 	}
 	//Read some info from node
-	len = readContent(&node, buf, offset, size);
+	len = readContentFromFile(&node, buf, offset, size);
 	//Size
 	return len;
 }
@@ -274,8 +270,7 @@ static int node_write(const char *path, const char *buf, size_t size, off_t offs
 	}
 	//Write node content
 	int len = 0;
-	len = writeContent(&node, buf, offset, size);
-	updateNode(node.number, &node);
+	len = writeContentToFile(&node, buf, offset, size);
 	return len;
 }
 //Flush file content
@@ -300,12 +295,12 @@ int node_truncate(const char *path, off_t newsize){
     int adding_l = (int)(newsize - node.content_size);
     char *buffer = (char *)malloc(adding_l);
     memset(buffer, 0, adding_l);
-    writeContent(&node, buffer, node.content_size, adding_l);
+    writeContentToFile(&node, buffer, node.content_size, adding_l);
     free(buffer);
   } else {
     node.content_size = newsize;
+    writeContentToFile(&node, (char *){0}, 0, 0);
   }
-	updateNode(node.number, &node);
   return 0;
 }
 //Remove directory
@@ -325,9 +320,9 @@ int node_rmdir(const char *path){
 }
 //Create filesystem
 void* node_init(struct fuse_conn_info *conn) {
-    initializeFile();
-  	mynode_initialization();
-  	initializeContent();
+  printf("node_init: инициализация файловой системы\n");
+  initializeFile();
+  mynode_initialization();
 }
 //EXTERMINATE
 void node_destroy(void* userdata){
@@ -347,6 +342,7 @@ static struct fuse_operations hello_oper = {
   .flush = node_flush,
   .release = node_release,
   .truncate = node_truncate,
+  .init = node_init,
   .destroy = node_destroy
 };
 

@@ -7,7 +7,8 @@ touch fstest/a/b.txt
 ls fstest/a
 echo -e "${GREEN}------------CREATE    DONE-------------${EMPTY}"
 echo -e "${GREEN}------------CONTENT  TESTS-------------${EMPTY}"
-echo "test string">fstest/a/c.txt
+echo "test content for file. it must be enough long for use
+inderect blocks of inode structure">fstest/a/c.txt
 ls fstest/a
 cat fstest/a/c.txt
 echo "another test string">fstest/a/b.txt

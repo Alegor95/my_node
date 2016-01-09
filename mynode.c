@@ -6,7 +6,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdlib.h>
-#include "node_content.h"
 //mynode defenition and it methods
 //Cache of inodes
 struct my_node my_nodes_cache[INODE_COUNT];
@@ -15,27 +14,18 @@ int addNode(struct my_node *node){
   return _addNode(node, 1);
 }
 int _addNode(struct my_node *node, int errorsThrow){
-  //Find node number
-  unsigned int new_number = 0; //Because 0 is reserved for root mynode
-  unsigned int i = 0;
-  for (i = 0; i < INODE_COUNT; i++){
-    if (my_nodes_cache[i].mode == 0){
-      new_number = i;
-      break;
-    }
+  //Add node to file_service
+  int errorCode = addNodeToFile(node);
+  if (errorCode){
+    return errorCode;
   }
-  //Free number not found - throw error(if it not internal call)
-  if (new_number == 0 && errorsThrow) return -1;
-  node->number=new_number;
-  //Write node to Cache
-  memcpy(&my_nodes_cache[new_number], node, sizeof(my_node));
-  if (NODE_DEBUG) printf("debug: добавлена нода с номером %d, mode %d\n",
-    new_number,
-    my_nodes_cache[new_number].mode);
+  //Everything ok
+  if (NODE_DEBUG) printf("debug: добавлена нода с номером %d\n",
+    node->number);
   return 0;
 }
 //Fill node with values
-int fillNode(struct my_node *node, int node_n, int mode, int dev_id, char *content){
+int fillNode(struct my_node *node, int node_n, int mode, int dev_id){
   node->number = node_n;
 	node->mode = mode;
   //
@@ -49,19 +39,17 @@ int fillNode(struct my_node *node, int node_n, int mode, int dev_id, char *conte
 	node->c_time = now;
 	node->m_time = now;
 	node->a_time = now;
-	node->block_size = BLOCK_SIZE;
-	node->block_count = 1;
-	//strcpy(node->content, content);
+	node->block_count = 0;
+	node->content_size = 0;
   return 0;
 }
 //Get node by it number
 int getNodeByNumber(int number, my_node *buffer){
   if (NODE_DEBUG) printf("debug: попытка получения ноды с номером %d\n", number);
-  if (my_nodes_cache[number].mode == 0){
+  if (readNodeFromFile(number, buffer)){
     if (NODE_DEBUG) printf("debug: нода с номером %d не найдена\n", number);
     return -1;
   }
-  memcpy(buffer, &my_nodes_cache[number], sizeof(my_node));
   if (NODE_DEBUG) printf("debug: получена нода с номером %d, контент %d\n",
     number,
     buffer->content_size);
@@ -81,7 +69,7 @@ int getNumberFromDirectory(struct my_node *dir, const char *filename){
   }
   char *buffer;
   buffer = (char *)malloc(dir->content_size);
-  readContent(dir, buffer, 0, dir->content_size);
+  readContentFromFile(dir, buffer, 0, dir->content_size);
   char *current_fname; char *numText;
   int fname_length = 0; int node_num = -1;
   while (buffer != NULL) {
@@ -156,7 +144,7 @@ int getNumberByPath(const char *path){
       path = next_path + 1;
       free(dir_name);
     } else {
-      if (NODE_DEBUG) printf("debug: конечная нода с именем %s\n", path);
+      if (NODE_DEBUG) printf("debug: конечная нода с именем \"%s\"\n", path);
       //If it's last entry, return number
       int number = getNumberFromDirectory(&dir, path);
       return number;
@@ -168,7 +156,7 @@ int getNumberByPath(const char *path){
 //Get node by it path
 int getNodeByPath(const char *path, struct my_node *node){
   int number = getNumberByPath(path);
-  if (getNodeByNumber(number, node)){
+  if (number < 0 || getNodeByNumber(number, node)){
     if (NODE_DEBUG) printf("debug: нода с путем %s не найдена\n", path);
     return -1;
   }
@@ -179,11 +167,10 @@ int updateNode(int number, my_node *node){
   if (NODE_DEBUG) printf("debug: попытка обновления ноды с номером %d, mode %d\n",
     number,
     my_nodes_cache[number].mode);
-  if (my_nodes_cache[number].mode == 0){
+  if (writeNodeToFile(number, node)){
     if (NODE_DEBUG) printf("debug: нода с номером %d не найдена\n", number);
     return -1;
   }
-  memcpy(&my_nodes_cache[number], node, sizeof(my_node));
   if (NODE_DEBUG) printf("debug: обновлена нода с номером %d, mode %d\n",
     number,
     my_nodes_cache[number].mode);
@@ -191,7 +178,7 @@ int updateNode(int number, my_node *node){
 }
 //Remove node
 int removeNode(int number){
-  my_nodes_cache[number].mode = 0;
+  removeNodeFromFile(number);
   if (NODE_DEBUG) printf("debug: удалена нода с номером %d\n",
     number);
   return 0;
@@ -205,9 +192,11 @@ int mynode_initialization(){
     my_nodes_cache[i] = (struct my_node){0};
   }
   //Add root node (0 number)
-  if (NODE_DEBUG) printf("debug: инициализация корневой ноды %s\n", "");
-  struct my_node root = (struct my_node){0};
-  fillNode(&root, 0, S_IFDIR | 0755, 0, "shit");//Директория же ж
-  _addNode(&root, 0);
+  if (getFreeNodeNum() == 0){
+    if (NODE_DEBUG) printf("debug: инициализация корневой ноды %s\n", "");
+    struct my_node root = (struct my_node){0};
+    fillNode(&root, 0, S_IFDIR | 0755, 0);//Директория же ж
+    _addNode(&root, 0);
+  }
   if (NODE_DEBUG) printf("%s\n", "debug: система нод готова");
 }
