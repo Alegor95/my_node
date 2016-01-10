@@ -5,7 +5,7 @@
 #define MYNODE_H_INCLUDED
 //Inode consts
 #define INODE_COUNT 100
-#define DIRECT_COUNT 10
+#define DIRECT_COUNT 5
 #define NODE_DEBUG 0
 //Inode structure
 typedef struct my_node{

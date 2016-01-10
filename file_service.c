@@ -106,10 +106,11 @@ int getBlockNumberFromNode(struct my_node *node, int num){
       block_num = node -> direct_blocks[num];
     } else {
       //We have undirect link, try get it number
-      char *buffer;
-      buffer = (char *)malloc(BLOCK_SIZE);
+      char *read_buffer;
+      read_buffer = (char *)malloc(BLOCK_SIZE);
       //Read block with position
-      readBlockFromFile(node->indirect_block, buffer, 0, BLOCK_SIZE);
+      readBlockFromFile(node->indirect_block, read_buffer, 0, BLOCK_SIZE);
+      char *buffer = read_buffer;
       //Get node number
       char *pos;
       char *next_pos;
@@ -119,10 +120,10 @@ int getBlockNumberFromNode(struct my_node *node, int num){
         if (pos != NULL){
           pos += sizeof(char);
           if (i == num  && strlen(pos) != 0){
-            next_pos = (char *)strstr(buffer, "\n");
+            next_pos = (char *)strstr(pos, "\n");
             if (next_pos == NULL) break;
-            int block_num_l = next_pos - pos - 1;
-            char *block_num_text = (char *)malloc(block_num_l)+1;
+            int block_num_l = next_pos - pos;
+            char *block_num_text = (char *)malloc(block_num_l+1);
             strncpy(block_num_text, pos, block_num_l);
             block_num_text[block_num_l] = 0;
             block_num = atoi(block_num_text);
@@ -131,8 +132,9 @@ int getBlockNumberFromNode(struct my_node *node, int num){
           }
         }
         buffer = pos;
+        i++;
       } while (pos != NULL);
-      free(buffer);
+      free(read_buffer);
     }
   }
   if (block_num < -1){
@@ -253,8 +255,8 @@ int writeBlockToFile(int block_num, char *buffer, off_t offset, size_t length){
     if (FILE_DEBUG) printf("debug: некорректная длина %d\n", (int)length);
     return -EIO;
   }
-  if (FILE_DEBUG) printf("debug: запись на позицию %ld, длина контента %d,%s\n",
-    block_position, (int)length, buffer);
+  if (FILE_DEBUG) printf("debug: запись на позицию %ld, длина %d, %.*s\n",
+    block_position, (int)length, (int)length, buffer);
   fwrite(buffer, sizeof(char), length, file);
   //Set block as filled
   if (!block_fill[block_num]){
@@ -286,8 +288,6 @@ int truncateNodeBlocks(struct my_node *node){
     int nb = 0;
     char *indirect_buffer = NULL;
     for (nb = 0; nb < blocks_to_add; nb++){
-      //Add new block
-      node->block_count++;
       //Get free block number
       int new_block_num = getFreeBlockNum();
       //Error thrown
@@ -299,7 +299,7 @@ int truncateNodeBlocks(struct my_node *node){
       //Write link to new block
       if (node->block_count < DIRECT_COUNT){
         //Just add block num to direct
-        node->direct_blocks[node->block_count-1] = new_block_num;
+        node->direct_blocks[node->block_count] = new_block_num;
       } else {
         if (node->block_count == DIRECT_COUNT){
           //Prepare block for indirect blocks
@@ -311,9 +311,12 @@ int truncateNodeBlocks(struct my_node *node){
         }
         //Write new block
         if (indirect_buffer == NULL){
+          indirect_buffer = (char *)malloc(BLOCK_SIZE);
           readBlockFromFile(node->indirect_block, indirect_buffer,
             0, BLOCK_SIZE);
         }
+        if (FILE_DEBUG) printf("debug: добавление ссылки на блок %d\n",
+          new_block_num);
         //Add new entry to indirect block
         char *entry = (char *)malloc(sizeof(int)*8+1);
         sprintf(entry, "%d\n", new_block_num);
@@ -325,6 +328,8 @@ int truncateNodeBlocks(struct my_node *node){
         indirect_buffer = tmp_block_content;
         free(entry);
       }
+      //Add new block
+      node->block_count++;
     }
     //Save inderect block
     if (indirect_buffer != NULL){
